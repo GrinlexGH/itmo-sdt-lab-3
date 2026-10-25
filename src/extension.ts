@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 
 const LANGS = ['c', 'cpp'];
+const FUNC_KINDS = new Set<vscode.SymbolKind>([
+  vscode.SymbolKind.Function,
+  vscode.SymbolKind.Method,
+  vscode.SymbolKind.Constructor
+]);
 
 function limits() {
   const cfg = vscode.workspace.getConfiguration('cComplexity');
@@ -12,6 +17,12 @@ function limits() {
   };
 }
 
+interface Sym {
+  name: string;
+  range: vscode.Range;
+  nameRange: vscode.Range;
+}
+
 interface FuncMetric {
   name: string;
   nameRange: vscode.Range;
@@ -19,7 +30,32 @@ interface FuncMetric {
   lines: number;
 }
 
-function analyze(doc: vscode.TextDocument): FuncMetric[] {
+type RawSymbol = vscode.DocumentSymbol | vscode.SymbolInformation;
+
+function getSymbolsInfo(symbols: RawSymbol[], out: Sym[]): void {
+  for (const s of symbols) {
+    if (FUNC_KINDS.has(s.kind)) {
+      const range = 'range' in s ? s.range : s.location.range;
+      const nameRange = 'selectionRange' in s ? s.selectionRange : range;
+      out.push({ name: s.name, range, nameRange });
+    }
+    if ('children' in s) {
+      getSymbolsInfo(s.children, out);
+    }
+  }
+}
+
+async function analyze(doc: vscode.TextDocument): Promise<FuncMetric[]> {
+  const raw = await vscode.commands.executeCommand<RawSymbol[]>(
+    'vscode.executeDocumentSymbolProvider',
+    doc.uri
+  );
+
+  const syms: Sym[] = [];
+  getSymbolsInfo(raw ?? [], syms);
+
+  console.log('aboba: ', syms);
+
   const range = new vscode.Range(0, 0, 0, 5);
   return [{ name: "stub", nameRange: range, complexity: 99, lines: 1 }];
 }
@@ -38,7 +74,7 @@ class MetricsCodeLensProvider implements vscode.CodeLensProvider {
       return [];
     }
 
-    const metrics = analyze(doc);
+    const metrics = await analyze(doc);
     return metrics.map(m => {
       const bad = m.complexity > threshold || m.lines > maxLines;
       const title =
@@ -55,17 +91,17 @@ class MetricsCodeLensProvider implements vscode.CodeLensProvider {
   }
 }
 
-function updateDiagnostics(
+async function updateDiagnostics(
   doc: vscode.TextDocument,
   collection: vscode.DiagnosticCollection
-): void {
+): Promise<void> {
   const { threshold, maxLines, diagnostics } = limits();
   if (!diagnostics) {
     collection.delete(doc.uri);
     return;
   }
 
-  const metrics = analyze(doc);
+  const metrics = await analyze(doc);
   const warnings: vscode.Diagnostic[] = [];
 
   for (const m of metrics) {
