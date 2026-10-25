@@ -2,7 +2,7 @@
   "name": "c-complexity",
   "displayName": "C/C++ Cyclomatic Complexity",
   "description": "Shows cyclomatic complexity and line count above each C/C++ function and warns when thresholds are exceeded",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.140.0"
   },
@@ -14,6 +14,9 @@
     "onLanguage:c",
     "onLanguage:cpp"
   ],
+  "repository": {
+    "url": "https://github.com/GrinlexGH/itmo-sdt-lab-3"
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [],
