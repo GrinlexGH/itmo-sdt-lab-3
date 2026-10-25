@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 
+const LANGS = ['c', 'cpp'];
+
 function limits() {
   const cfg = vscode.workspace.getConfiguration('cComplexity');
   return {
@@ -11,6 +13,7 @@ function limits() {
 }
 
 interface FuncMetric {
+  name: string;
   nameRange: vscode.Range;
   complexity: number;
   lines: number;
@@ -18,7 +21,7 @@ interface FuncMetric {
 
 function analyze(doc: vscode.TextDocument): FuncMetric[] {
   const range = new vscode.Range(0, 0, 0, 5);
-  return [{ nameRange: range, complexity: 99, lines: 1 }];
+  return [{ name: "stub", nameRange: range, complexity: 99, lines: 1 }];
 }
 
 class MetricsCodeLensProvider implements vscode.CodeLensProvider {
@@ -52,18 +55,66 @@ class MetricsCodeLensProvider implements vscode.CodeLensProvider {
   }
 }
 
+function updateDiagnostics(
+  doc: vscode.TextDocument,
+  collection: vscode.DiagnosticCollection
+): void {
+  const { threshold, maxLines, diagnostics } = limits();
+  if (!diagnostics) {
+    collection.delete(doc.uri);
+    return;
+  }
+
+  const metrics = analyze(doc);
+  const warnings: vscode.Diagnostic[] = [];
+
+  for (const m of metrics) {
+    if (m.complexity > threshold) {
+      warnings.push(new vscode.Diagnostic(
+        m.nameRange,
+        `Function "${m.name}" has cyclomatic complexity ${m.complexity} (limit ${threshold}).`,
+        vscode.DiagnosticSeverity.Warning
+      ));
+    }
+
+    if (m.lines > maxLines) {
+      warnings.push(new vscode.Diagnostic(
+        m.nameRange,
+        `Function "${m.name}" is ${m.lines} lines long (limit ${maxLines}).`,
+        vscode.DiagnosticSeverity.Warning
+      ));
+    }
+  }
+
+  collection.set(doc.uri, warnings);
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const lensProvider = new MetricsCodeLensProvider();
   const diagnostics = vscode.languages.createDiagnosticCollection('c-complexity');
+  const selector = LANGS.map(language => ({ language }));
+
+  const update = (doc: vscode.TextDocument) => {
+    if (!LANGS.includes(doc.languageId)) { return; }
+    updateDiagnostics(doc, diagnostics);
+    lensProvider.refresh();
+  };
 
   context.subscriptions.push(
     diagnostics,
-    vscode.languages.registerCodeLensProvider([{language: 'c'}, {language: 'cpp'}], lensProvider),
+    vscode.languages.registerCodeLensProvider(selector, lensProvider),
 
-    vscode.workspace.onDidOpenTextDocument(e => {
-      lensProvider.refresh();
-    }),
+    vscode.workspace.onDidOpenTextDocument(update),
+    vscode.workspace.onDidSaveTextDocument(update),
+    vscode.workspace.onDidCloseTextDocument(d => diagnostics.delete(d.uri)),
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('cComplexity')) {
+        vscode.workspace.textDocuments.forEach(update);
+      }
+    })
   );
+
+  vscode.workspace.textDocuments.forEach(update);
 }
 
 export function deactivate() { }
