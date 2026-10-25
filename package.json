@@ -1,23 +1,48 @@
 {
   "name": "c-complexity",
-  "displayName": "C Complexity",
-  "description": "Calculates complexity for C functions.",
+  "displayName": "C/C++ Cyclomatic Complexity",
+  "description": "Shows cyclomatic complexity and line count above each C/C++ function and warns when thresholds are exceeded",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.140.0"
   },
   "categories": [
+    "Linters",
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": ["onLanguage:c", "onLanguage:cpp"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "c-complexity.helloWorld",
-        "title": "Hello World"
+      { "command": "cComplexity.showReport", "title": "C/C++ Cyclomatic Complexity: Show Functions Report" }
+    ],
+    "configuration": {
+      "title": "C/C++ Cyclomatic Complexity",
+      "properties": {
+        "cComplexity.threshold": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "description": "Cyclomatic complexity above which a function gets a warning."
+        },
+        "cComplexity.maxLines": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Function length (lines) above which a function gets a warning."
+        },
+        "cComplexity.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show metrics above each function."
+        },
+        "cComplexity.diagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Report threshold violations in the Problems panel."
+        }
       }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
