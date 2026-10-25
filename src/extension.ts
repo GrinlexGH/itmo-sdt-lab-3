@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { hasBody } from './complexity';
 
 const LANGS = ['c', 'cpp'];
 const FUNC_KINDS = new Set<vscode.SymbolKind>([
@@ -54,10 +55,21 @@ async function analyze(doc: vscode.TextDocument): Promise<FuncMetric[]> {
   const syms: Sym[] = [];
   getSymbolsInfo(raw ?? [], syms);
 
-  console.log('aboba: ', syms);
+  const result: FuncMetric[] = [];
+  for (const s of syms) {
+    const text = doc.getText(s.range);
+    if (!hasBody(text)) {
+      continue;
+    }
+    result.push({
+      name: s.name,
+      nameRange: s.nameRange,
+      complexity: 99,
+      lines: s.range.end.line - s.range.start.line + 1
+    });
+  }
 
-  const range = new vscode.Range(0, 0, 0, 5);
-  return [{ name: "stub", nameRange: range, complexity: 99, lines: 1 }];
+  return result;
 }
 
 class MetricsCodeLensProvider implements vscode.CodeLensProvider {
@@ -101,7 +113,11 @@ async function updateDiagnostics(
     return;
   }
 
+  // File can change between await return
+  const version = doc.version;
   const metrics = await analyze(doc);
+  if (doc.version !== version) { return; }
+
   const warnings: vscode.Diagnostic[] = [];
 
   for (const m of metrics) {
@@ -150,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  vscode.workspace.textDocuments.forEach(update);
+  setTimeout(() => vscode.workspace.textDocuments.forEach(d => update(d)), 2000);
 }
 
 export function deactivate() { }
