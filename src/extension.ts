@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { hasBody } from './complexity';
+import { cyclomaticComplexity, hasBody } from './complexity';
 
 const LANGS = ['c', 'cpp'];
 const FUNC_KINDS = new Set<vscode.SymbolKind>([
@@ -64,7 +64,7 @@ async function analyze(doc: vscode.TextDocument): Promise<FuncMetric[]> {
     result.push({
       name: s.name,
       nameRange: s.nameRange,
-      complexity: 99,
+      complexity: cyclomaticComplexity(text),
       lines: s.range.end.line - s.range.start.line + 1
     });
   }
@@ -97,7 +97,7 @@ class MetricsCodeLensProvider implements vscode.CodeLensProvider {
         (m.lines > maxLines ? ` (limit ${maxLines})` : '');
       return new vscode.CodeLens(
         new vscode.Range(m.nameRange.start, m.nameRange.start),
-        { title, command: 'cComplexity.showReport' }
+        { title, command: '' }
       );
     });
   }

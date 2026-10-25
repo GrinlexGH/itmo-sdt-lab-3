@@ -10,12 +10,13 @@
     "Linters",
     "Other"
   ],
-  "activationEvents": ["onLanguage:c", "onLanguage:cpp"],
+  "activationEvents": [
+    "onLanguage:c",
+    "onLanguage:cpp"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      { "command": "cComplexity.showReport", "title": "C/C++ Cyclomatic Complexity: Show Functions Report" }
-    ],
+    "commands": [],
     "configuration": {
       "title": "C/C++ Cyclomatic Complexity",
       "properties": {
