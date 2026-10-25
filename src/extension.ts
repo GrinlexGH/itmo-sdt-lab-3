@@ -1,7 +1,69 @@
 import * as vscode from 'vscode';
 
-export function activate(context: vscode.ExtensionContext) {
-  console.log('Congratulations, your extension "c-complexity" is now active!');
+function limits() {
+  const cfg = vscode.workspace.getConfiguration('cComplexity');
+  return {
+    threshold: cfg.get<number>('threshold', 10),
+    maxLines: cfg.get<number>('maxLines', 50),
+    codeLens: cfg.get<boolean>('codeLens', true),
+    diagnostics: cfg.get<boolean>('diagnostics', true)
+  };
 }
 
-export function deactivate() {}
+interface FuncMetric {
+  nameRange: vscode.Range;
+  complexity: number;
+  lines: number;
+}
+
+function analyze(doc: vscode.TextDocument): FuncMetric[] {
+  const range = new vscode.Range(0, 0, 0, 5);
+  return [{ nameRange: range, complexity: 99, lines: 1 }];
+}
+
+class MetricsCodeLensProvider implements vscode.CodeLensProvider {
+  private readonly emitter = new vscode.EventEmitter<void>();
+  readonly onDidChangeCodeLenses = this.emitter.event;
+
+  refresh(): void {
+    this.emitter.fire();
+  }
+
+  async provideCodeLenses(doc: vscode.TextDocument): Promise<vscode.CodeLens[]> {
+    const { threshold, maxLines, codeLens } = limits();
+    if (!codeLens) {
+      return [];
+    }
+
+    const metrics = analyze(doc);
+    return metrics.map(m => {
+      const bad = m.complexity > threshold || m.lines > maxLines;
+      const title =
+        (bad ? '$(warning) ' : '') +
+        `Complexity: ${m.complexity}` +
+        (m.complexity > threshold ? ` (limit ${threshold})` : '') +
+        ` · ${m.lines} lines` +
+        (m.lines > maxLines ? ` (limit ${maxLines})` : '');
+      return new vscode.CodeLens(
+        new vscode.Range(m.nameRange.start, m.nameRange.start),
+        { title, command: 'cComplexity.showReport' }
+      );
+    });
+  }
+}
+
+export function activate(context: vscode.ExtensionContext) {
+  const lensProvider = new MetricsCodeLensProvider();
+  const diagnostics = vscode.languages.createDiagnosticCollection('c-complexity');
+
+  context.subscriptions.push(
+    diagnostics,
+    vscode.languages.registerCodeLensProvider([{language: 'c'}, {language: 'cpp'}], lensProvider),
+
+    vscode.workspace.onDidOpenTextDocument(e => {
+      lensProvider.refresh();
+    }),
+  );
+}
+
+export function deactivate() { }
